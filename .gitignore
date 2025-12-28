@@ -34,3 +34,4 @@ Thumbs.db
 
 # --- Optional: keep large/generated docs out of git ---
 repo1_iot_schedule.pdf
+mosquitto/mosquitto.conf
