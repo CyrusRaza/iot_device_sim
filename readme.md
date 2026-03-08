@@ -40,23 +40,34 @@ transport layer to be replaced without modifying application logic.
 ``` mermaid
 flowchart TD
 
-A[User selects transport] --> B[transport_select()]
-B --> C{Transport Strategy}
+A[User selects transport] 
+B["transport_select()"]
+C{Transport Strategy}
+A --> B 
+B --> C
 
-C -->|MQTT| D[MQTT Transport]
-C -->|WebSocket| E[WebSocket Transport]
+D[MQTT Transport]
+E[WebSocket Transport]
 
-D --> F[Message Receive Thread]
+C --> |MQTT| D
+C --> |WEBSOCKET| E
+F[Message Receive Thread]
+D --> F
 E --> F
 
-F --> G[Thread-safe Message Queue]
+G[Thread-safe Message Queue]
+F --> G
 
-G --> H[Command Parser Thread]
+H[Command Parser Thread]
+G --> H
 
-H --> I{Command Valid?}
+I{Command Valid?}
+H --> I
+J[Execute Command]
+K[Discard Message]
+I --> |YES| J
+I --> |NO| K
 
-I -->|Yes| J[Execute Command]
-I -->|No| K[Discard Message]
 ```
 
 ------------------------------------------------------------------------
