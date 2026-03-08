@@ -1,9 +1,20 @@
 
 //#include "some_header.h"
 
-#ifndef TYPEDEF
-#define TYPEDEF
+#ifndef TYPEDEFE
+#define TYPEDEFE
 typedef struct trans transport_type;
+#endif
+
+
+
+
+#ifndef SEMA
+#define SEMA
+
+#define SEM_OVERWRITE "/sem_overwrite"
+#define SEM_UNDERWRITE "/sem_underwrite"
+
 #endif
 
 typedef struct transport_vtable{

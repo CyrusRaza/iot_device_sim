@@ -4,12 +4,12 @@ project(device_sim C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-add_executable(device_sim src/main.c src/transport_select.c src/mqtt_transport.c)
+add_executable(device_sim src/main.c src/transport_select.c src/mqtt_transport.c src/shared_mem.c src/ws_transport.c)
 target_include_directories(device_sim PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src 
 )
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(MOSQUITTO REQUIRED IMPORTED_TARGET libmosquitto )
+pkg_check_modules(MOSQUITTO REQUIRED IMPORTED_TARGET libmosquitto libwebsockets)
 
 target_link_libraries(device_sim PRIVATE PkgConfig::MOSQUITTO)
 target_compile_options(device_sim PRIVATE -Wall -Wextra -Wpedantic)

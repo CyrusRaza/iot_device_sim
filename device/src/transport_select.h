@@ -11,8 +11,8 @@ typedef struct config_pr config_pr;
 
 //#endif
 
-transport_type* mqtt_constructor(char* host, int port, char* msg, char* id);
+transport_type* mqtt_constructor(char* host, int port, char* msg, char* id, void* userdata);
 //struct transport_type* http_constructor(char* host, int port, char* msg);
-//struct transport_type* webs_constructor(char* host, int port, char* msg);
+struct transport_type* webs_constructor(char* host, int port, char* msg, char* id, void* userdata);
 
-transport_type* transport_sel(struct config_pr conf, char* host, int port, char* msg);
+transport_type* transport_sel(struct config_pr conf, char* host, int port, char* msg, void* userdata);

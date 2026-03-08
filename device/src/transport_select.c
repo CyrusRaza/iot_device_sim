@@ -13,19 +13,19 @@
 #include <ctype.h>
 
 
-transport_type* transport_sel(config_pr conf, char* host, int port, char* msg)
+transport_type* transport_sel(config_pr conf, char* host, int port, char* msg, void* userdata)
 {
     transport_type* temp = NULL;
     switch (conf.transport){
         case 0:
-        temp = mqtt_constructor(host, port, msg, conf.device_id);
+        temp = mqtt_constructor(host, port, msg, conf.device_id, userdata);
         printf("mqqt selected\n");
         break;
         case 1:
         //temp = http_constructor(host,port);
         break;
         case 2:
-        //temp = webs_constructor(host, port);
+        temp = webs_constructor(host, port, msg, conf.device_id, userdata);
         break;
         default:
         printf("error with enum transport type.\n");

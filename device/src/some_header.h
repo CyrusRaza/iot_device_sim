@@ -1,16 +1,26 @@
 #ifndef MQTT_H
 #define MQTT_H
 
-#include "transport.h"
-#include "transport_select.h"
+//#include "transport.h"
+//#include "transport_select.h"
 
 #endif
 
+
+#ifndef SEMA
+#define SEMA
+
+#define SEM_OVERWRITE "/sem_overwrite"
+#define SEM_UNDERWRITE "/sem_underwrite"
+
+#endif
 
 #ifndef CHARARRAY
 #define CHARARRAY
 static const char* transport_t[] = {"mqtt", "http", "webs"};
 #endif
+
+#define NUM_COMMANDS 5
 
 enum types_transport {
     MQTT,
