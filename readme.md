@@ -110,8 +110,17 @@ pattern**.
 The application interacts with a common **transport interface**, while
 concrete implementations provide protocol-specific behavior.
 
-Application Logic │ ▼ Transport Interface (function table) │
-┌──────┴────────┐ │ │ MQTT Strategy WebSocket Strategy
+```mermaid
+flowchart TD
+    A[Application Logic] 
+    B[Transport Interface]
+    A --> B
+
+    C[MQTT Strategy]
+    D[WebSocket Strategy]
+    B --> C
+    B --> D
+```
 
 The application does not need to know which transport is active.
 
@@ -131,11 +140,46 @@ encapsulation.
 
 Conceptually:
 
-transport_t (base interface)
+```mermaid
+classDiagram
+    class Main {
+        +select transport
+        +call transport API
+    }
 
-mqtt_transport_t └─ extends transport_t
+    class transport_type {
+        <<interface>>
+        +init()
+        +connect()
+        +send()
+        +poll()
+        +destroy()
+    }
 
-websocket_transport_t └─ extends transport_t
+    class mqtt_transport_type{
+        <<interface>>
+        +mqtt_init()
+        +mqtt_connect()
+        +mqtt_send()
+        +mqtt_poll()
+        +mqtt_destroy()
+        +mqtt_constructor()
+    }
+
+    class webs_transport_type{
+        <<interface>>
+        +webs_init()
+        +webs_connect()
+        +webs_send()
+        +webs_poll()
+        +webs_destroy()
+        +webs_constructor()
+    }
+
+    Main --> transport_type : uses
+    transport_t <|-- mqtt_transport_type
+    transport_t <|-- webs_transport_type
+```
 
 The application only interacts with the **base transport interface**.
 
