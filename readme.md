@@ -177,8 +177,8 @@ classDiagram
     }
 
     Main --> transport_type : uses
-    transport_t <|-- mqtt_transport_type
-    transport_t <|-- webs_transport_type
+    transport_type <|-- mqtt_transport_type
+    transport_type <|-- webs_transport_type
 ```
 
 The application only interacts with the **base transport interface**.
