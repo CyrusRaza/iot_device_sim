@@ -216,6 +216,14 @@ project/
 │   ├── transport.h
 │   ├── command_parser.h
 │   └── message_queue.h
+├── tests/
+|   ├── unity/
+|   |   ├──unity.c
+|   |   ├──unity.h
+|   |   ├──unity_internals.h
+│   ├── tests_queue.c
+│   ├── tests_string_parcer.c
+│   └── test_transport_select.c
 └── README.md
 └── Cmakelists.txt
 ```
@@ -237,10 +245,8 @@ These tests verify system behavior independently of the network layer.
 
 # Example Commands
 
-SET TEMP 25\
-LED ON\
-LED OFF\
-STATUS
+temp_set: 25\
+pub_rate : 20
 
 Invalid or malformed commands are safely ignored.
 
