@@ -156,25 +156,10 @@ classDiagram
         +destroy()
     }
 
-    class mqtt_transport_type{
-        <<interface>>
-        +mqtt_init()
-        +mqtt_connect()
-        +mqtt_send()
-        +mqtt_poll()
-        +mqtt_destroy()
-        +mqtt_constructor()
-    }
+    class mqtt_transport_type
 
-    class webs_transport_type{
-        <<interface>>
-        +webs_init()
-        +webs_connect()
-        +webs_send()
-        +webs_poll()
-        +webs_destroy()
-        +webs_constructor()
-    }
+
+    class webs_transport_type
 
     Main --> transport_type : uses
     transport_type <|-- mqtt_transport_type
@@ -218,11 +203,22 @@ This architecture prevents network I/O from blocking command processing.
 
 # Project Structure
 
-project/ │ ├── src/ │ ├── main.c │ ├── transport_select.c │ ├──
-mqtt_transport.c │ ├── websocket_transport.c │ ├── command_parser.c │
-├── message_queue.c │ ├── include/ │ ├── transport.h │ ├──
-command_parser.h │ ├── message_queue.h │ ├── tests/ │ ├── test_parser.c
-│ ├── test_queue.c │ ├── test_transport_select.c │ └── README.md
+```text
+project/
+├── src/
+│   ├── main.c
+│   ├── transport_select.c
+│   ├── mqtt_transport.c
+│   ├── websocket_transport.c
+│   ├── command_parser.c
+│   └── message_queue.c
+├── include/
+│   ├── transport.h
+│   ├── command_parser.h
+│   └── message_queue.h
+└── README.md
+└── Cmakelists.txt
+```
 
 ------------------------------------------------------------------------
 
