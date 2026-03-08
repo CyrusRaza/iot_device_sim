@@ -6,6 +6,8 @@
 #include "transport.h"
 #include "transport_select.h"
 #include "shared_mem.h"
+#include "string_parser.h"
+
 
 // header contents
 
@@ -21,114 +23,8 @@
 #include <sys/stat.h>
 #include <threads.h>
 
-static mtx_t mutex;
-
-const char* command_list[NUM_COMMANDS] = {"temp_set", "pub_rate", "some1", "some2", "some3"};
-static int command_vals[NUM_COMMANDS] = {0, 0, 0, 0, 0};
-static void sleep_ms(long ms){
-    struct timespec ts = { .tv_sec = ms/1000, .tv_nsec = (ms%1000)*1000000L };
-    nanosleep(&ts, NULL);
-}
 
 
-int check_key(char* key)
-{
-    for (int i=0; i < NUM_COMMANDS; i++)
-    {
-        if (strcmp(key, command_list[i])==0)
-        {
-            printf("fn check_key: match found\n");
-            return i;
-        }
-    }
-    return -1;
-    
-}
-
-int change_val(char* key, char* val, int index)
-{
-    mtx_lock(&mutex);
-    command_vals[index] = val;
-    mtx_unlock(&mutex);
-}
-
-
-void remove_spaces (char* restrict str_trimmed, const char* restrict str_untrimmed)
-{
-  while (*str_untrimmed != '\0')
-  {
-    if(!isspace(*str_untrimmed))
-    {
-      *str_trimmed = *str_untrimmed;
-      str_trimmed++;
-    }
-    str_untrimmed++;
-  }
-  *str_trimmed = '\0';
-}
-
-
-
-int string_parser(void* obj)
-{
-    shared_mem* queue = *(shared_mem**) obj;
-    printf("fn string_parser: write_ind %i, read_ind %i\n", queue->write_ind, queue->read_ind);
-    bool queue_empty = false;
-    for(int i = 0; i<25; i++)
-    {
-        
-        //printf("is this working? %i \n", (int)queue_empty);
-        queue_empty = queue_is_empty(queue);
-        if (!queue_empty)
-        {
-           // printf("queue not empty biatch\n");
-            char msg[BUFFER_SIZE];
-            queue_pop(queue, msg);
-            //strcpy(msg, (char*) obj);
-            char* msg_spc_rm = malloc(strlen(msg));
-            remove_spaces(msg_spc_rm, msg);
-            
-            
-            char* key_val = strtok(msg_spc_rm, ",{}");
-            char key[20];
-            char* val;
-            //printf("check1\n");
-            while(key_val != NULL)
-            {
-                val = strchr(key_val, ':');
-                //printf("check2 %s\n", key_val);
-            
-                if (val != NULL)
-                {
-                    if (val-key_val < 20)
-                    {
-                        strncpy(key, key_val, val-key_val+1);
-                        *(key + (val-key_val)) = '\0';
-                        int ret_val = check_key(key);
-                        //printf("check3 %s %s \n", key, val);
-            
-                        if (ret_val!=-1)
-                        {
-                            printf("fn string_parser: changing %s to %i\n", key, atoi(val+1));
-                            change_val(key, atoi(val+1), ret_val);
-                        }
-                    }
-                    else
-                    {
-                        printf("fn string_parser:key too big\n");
-                    }
-                }   
-                key_val = strtok(NULL, ",{}");
-            }
-            free(msg_spc_rm);
-            msg_spc_rm=NULL;
-            
-        }
-        sleep_ms(1000);
-    }
-    //printf("Hello from the other side.\n");
-    return 123;
-}
 
 
 config_pr* argument_parse(int argc, char* argv[])
@@ -226,14 +122,14 @@ int main(int argc, char* argv[])
         printf("fn main: Semephore under failed from main\n");
         exit;
     }
-    mtx_init(&mutex, mtx_plain);
+    init_shared_lock();
     config_pr* conf = argument_parse(argc, argv);
     if (conf == NULL)
     {
         printf("fn main: faulty arguments provided. \n");
         return 1;
     }
-    //printf("here for you\n");
+    
     thrd_t other_thread;
     shared_mem* queue = queue_create();
 
@@ -246,14 +142,12 @@ int main(int argc, char* argv[])
         queue_destroy(queue);
         return 465;
     }
-    //printf("after thread\n");
+    
     transport_type* tra = transport_sel(*conf, "127.0.0.1", conf->port, "hello", (void *)&queue);
     if (tra== NULL)
     {
         return 1;
     }
-
-    
 
     
     int rc = 0;
@@ -271,21 +165,15 @@ int main(int argc, char* argv[])
 
     for(int i=0; i<20; i++)
     {
-        for(int f = 0; f < NUM_COMMANDS;f++)
-        {
-            mtx_lock(&mutex);
-            printf("fn main: %s: %i\t",command_list[f], command_vals[f]);
-            mtx_unlock(&mutex);
-        }
-        printf("\n");
-
+        print_commands();
+        
         tra->vt->publish(tra);
         sleep_ms(1000);
         
     }
     
     thrd_join(other_thread, &rc);
-    mtx_destroy(&mutex);
+    mtx_destroy(&command_vals_mutex);
     tra->vt->destroy(tra);
     queue_destroy(queue);
     free(conf);

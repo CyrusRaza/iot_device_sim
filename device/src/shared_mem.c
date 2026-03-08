@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 //#include <stdatomic.h>
 
 
@@ -9,9 +10,15 @@
 shared_mem* queue_create()
 {
     shared_mem* queue = malloc(sizeof(shared_mem));
-    *queue = (shared_mem){
-        .char_arr = "",
-    };
+    if (!queue)
+    {
+        return NULL;
+    }
+
+    for (int i = 0; i < BUFFER_SIZE; i++) 
+    {
+        queue->char_arr[i] = NULL;
+    }
     atomic_init(&(queue->read_ind), 0);
     atomic_init(&(queue->write_ind), 0);
     return queue;
@@ -22,9 +29,14 @@ int queue_push(struct shared_mem* self, char* data, int len)
 {
     if (!queue_is_full(self))
     {
-        self->char_arr[self->write_ind % BUFFER_SIZE] = malloc(len+1);
-        strncpy(self->char_arr[self->write_ind % BUFFER_SIZE], data, len);
-        self->char_arr[self->write_ind % BUFFER_SIZE][len] = '\0';
+        int idx = self->write_ind % BUFFER_SIZE;
+        self->char_arr[idx] = malloc(len+1);
+        if (!self->char_arr[idx])
+        {
+            return 1;
+        }
+        strncpy(self->char_arr[idx], data, len);
+        self->char_arr[idx][len] = '\0';
         printf("write ind %i\n", self->write_ind);
         atomic_fetch_add(&(self->write_ind), 1);
         return 0;
@@ -40,12 +52,11 @@ int queue_pop(struct shared_mem* self, char* popped_data)
 {
     if (!queue_is_empty(self))
     {
-        strcpy(popped_data, self->char_arr[self->read_ind % BUFFER_SIZE]);
-        free(self->char_arr[self->read_ind % BUFFER_SIZE]);
-        memset(self->char_arr,0, BUFFER_SIZE);
-        printf("read_int %i\n", self->read_ind);
+        int idx = self->read_ind % BUFFER_SIZE;
+        strcpy(popped_data, self->char_arr[idx]);
+        free(self->char_arr[idx]);
+        self->char_arr[idx] = NULL;
         atomic_fetch_add(&self->read_ind, 1);
-        printf("read_int %i\n", self->read_ind);
         
         return 0;
     }
@@ -58,46 +69,28 @@ int queue_pop(struct shared_mem* self, char* popped_data)
 
 bool queue_is_full(struct shared_mem* self)
 {
-    if ((self->write_ind % BUFFER_SIZE) == ((self->read_ind % BUFFER_SIZE) - 1))
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
+    return ((self->write_ind - self->read_ind) >= BUFFER_SIZE);
 }
 
 bool queue_is_empty(struct shared_mem* self)
 {
     //printf("write : %i, read : %i\n", self->write_ind, self->read_ind);
-    if ((self->write_ind) == ((self->read_ind)))
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
+    return ((self->write_ind) == ((self->read_ind)));
 }
 
 int queue_free_spaces(struct shared_mem* self)
 {
-    return (BUFFER_SIZE - ((self->write_ind % BUFFER_SIZE) - (self->read_ind % BUFFER_SIZE)));
+    return (BUFFER_SIZE - ((self->write_ind) - (self->read_ind)));
 }
 
 int queue_filled_spaces(struct shared_mem* self)
 {
-    return ((self->write_ind % BUFFER_SIZE) - (self->read_ind % BUFFER_SIZE));
+    return ((self->write_ind) - (self->read_ind));
 }
 
 void queue_destroy(shared_mem* queue)
 {
-    int i = 0;
-    char* temp;
-    while (i!=1)
-    {
-        i = queue_pop(queue, temp);
-    }
+    char temp[BUFFER_SIZE+1];
+    while (queue_pop(queue, temp) !=1){}
     free(queue);
 }

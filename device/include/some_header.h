@@ -20,7 +20,6 @@
 static const char* transport_t[] = {"mqtt", "http", "webs"};
 #endif
 
-#define NUM_COMMANDS 5
 
 enum types_transport {
     MQTT,

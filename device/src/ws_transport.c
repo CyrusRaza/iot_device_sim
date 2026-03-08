@@ -89,46 +89,41 @@ static int callback_ws(struct lws *wsi,
     struct ws_server_t *s = server_from_wsi(wsi);
     if (!s) return 0;
 
-    switch (reason) {
-    case LWS_CALLBACK_ESTABLISHED:
-        lwsl_user("WS client connected\n");
-        //if (s->cfg.on_connect) s->cfg.on_connect(s->cfg.user_ctx);
-        ws_on_connect(in);
-        break;
+    switch (reason)
+    {
+        case LWS_CALLBACK_ESTABLISHED:
+            lwsl_user("WS client connected\n");
+            ws_on_connect(in);
+            break;
 
-    case LWS_CALLBACK_RECEIVE:
-        // App callback gets the received message
-        //if (s->cfg.on_message) {
-            // Note: LWS gives you message bytes in `in` with length `len`
-            // In real apps, validate size/content.
-            ws_on_message(s->userdata, in, len);
-        //}
-        break;
+        case LWS_CALLBACK_RECEIVE:
+                ws_on_message(s->userdata, in, len);
+            break;
 
-    case LWS_CALLBACK_SERVER_WRITEABLE:
-        // When LWS says this connection can write, we send pending broadcast
-
-        if (s->has_pending && s->pending && s->pending_len > 0) {
-            int n = lws_write(wsi,
-                              s->pending + LWS_PRE,
-                              (unsigned int)s->pending_len,
-                              LWS_WRITE_TEXT);
-            if (n < 0) {
-                lwsl_err("lws_write failed\n");
-                s->fatal_error = 1;
-                return -1; // close this connection
+        case LWS_CALLBACK_SERVER_WRITEABLE:
+            
+            if (s->has_pending && s->pending && s->pending_len > 0) 
+            {
+                int n = lws_write(wsi,
+                                s->pending + LWS_PRE,
+                                (unsigned int)s->pending_len,
+                                LWS_WRITE_TEXT);
+                if (n < 0)
+                {
+                    lwsl_err("lws_write failed\n");
+                    s->fatal_error = 1;
+                    return -1;
+                }
             }
-        }
-        break;
+            break;
 
-    case LWS_CALLBACK_CLOSED:
-        lwsl_user("WS client disconnected\n");
-        //if (s->cfg.on_disconnect) s->cfg.on_disconnect(s->cfg.user_ctx);
-        ws_on_disconnect(in);
-        break;
+        case LWS_CALLBACK_CLOSED:
+            lwsl_user("WS client disconnected\n");
+            ws_on_disconnect(in);
+            break;
 
-    default:
-        break;
+        default:
+            break;
     }
 
     return 0;
@@ -140,7 +135,8 @@ int *webs_init(transport_type* self)
     webs_transport_type *ws = (webs_transport_type *) self;
 
     printf("fn webs_init: whatup\n");
-    if (!ws || ws->port <= 0 || !ws->protocol || ws->max_payload == 0) {
+    if (!ws || ws->port <= 0 || !ws->protocol || ws->max_payload == 0)
+    {
         printf("fn webs_init: port %i, protocol %s, max_payload %i, or ws faulty\n", ws->port, ws->protocol, ws->max_payload);
         errno = EINVAL;
         return -1;
@@ -174,7 +170,8 @@ int *webs_init(transport_type* self)
 
 
     ws->serv->protocols = (struct lws_protocols *)calloc(2, sizeof(struct lws_protocols));
-    if (!ws->serv->protocols) {
+    if (!ws->serv->protocols)
+    {
         printf("fn webs_init: lws_protocols calloc failed\n");
         free(ws->serv);
         return -1;
@@ -195,7 +192,6 @@ int *webs_init(transport_type* self)
     info.port = ws->port;
     info.protocols = ws->serv->protocols;
 
-    // Store ws_server_t* on the context so callbacks can retrieve it
     info.user = ws->serv;
 
     ws->serv->ctx = lws_create_context(&info);
