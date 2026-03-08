@@ -18,10 +18,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y cmake build-essential
 
       - name: Configure
-        run: cmake -S . -B build
+        run: cmake -S device -B device/build -DCMAKE_BUILD_TYPE=Debug
 
       - name: Build
-        run: cmake --build build
+        run: cmake --build device/build -j
 
       - name: Run tests
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir device/build --output-on-failure
