@@ -1,290 +1,134 @@
-# Modular MQTT / WebSocket Command Framework (C)
+# IoT Device Simulator: Modular Transport and Command Framework in C
 
-A modular communication framework written in **C** that supports
-**MQTT** and **WebSocket** transports for receiving and executing
-commands from external devices or services.
+[![C Tests](https://github.com/CyrusRaza/iot_device_sim/actions/workflows/ci.yaml/badge.svg)](https://github.com/CyrusRaza/iot_device_sim/actions/workflows/ci.yaml)
+![C11](https://img.shields.io/badge/C-C11-00599C)
+![License: MIT](https://img.shields.io/badge/License-MIT-green)
 
-The project demonstrates **embedded-style architecture**, including
-protocol abstraction, multi-threaded message processing, and modular
-design using opaque structs and function tables.
+A simulated IoT edge device written in C11. It receives configuration commands over a runtime-selectable transport (MQTT or WebSocket), hands them to a separate parser thread through a bounded queue, and applies them to the device state.
 
-This project was developed as part of an **embedded software engineering
-portfolio** to demonstrate system architecture, concurrency, and
-testable design in C.
+The goal is to practise the patterns used in embedded firmware on a desktop target first: an interface in plain C (function-pointer table and opaque objects), a producer/consumer split between I/O and processing, and unit-tested core logic. It runs on Linux; it has not been ported to a microcontroller yet.
 
-------------------------------------------------------------------------
+## What it does
 
-# Overview
+1. The device starts with a device ID, a transport (`mqtt` or `webs`) and a port.
+2. The selected transport is created behind a common interface and connects:
+   - **MQTT:** a libmosquitto client connects to a local broker, subscribes to `test/sub` and publishes a status message on `test/pub` once per second.
+   - **WebSocket:** a libwebsockets server accepts a client on the given port.
+3. Every incoming message is pushed into a bounded ring buffer.
+4. A parser thread pops messages, parses `key: value` pairs and updates the matching command value (for example `temp_set` or `pub_rate`). Unknown keys and non-integer values are ignored.
 
-The program receives commands from external systems over a network
-transport layer and executes them within the application.
-
-Supported transports:
-
--   MQTT
--   WebSocket
-
-The transport backend is selected **at runtime** based on user input.
-The application itself remains **protocol-agnostic**.
-
-Incoming messages are placed into a **thread-safe shared queue**, where
-they are processed by a dedicated **command parser thread**.
-
-This design separates network I/O from command execution and allows the
-transport layer to be replaced without modifying application logic.
-
-------------------------------------------------------------------------
-
-# System Architecture
-
-``` mermaid
-flowchart TD
-
-A[User selects transport] 
-B["transport_select()"]
-C{Transport Strategy}
-A --> B 
-B --> C
-
-D[MQTT Transport]
-E[WebSocket Transport]
-
-C --> |MQTT| D
-C --> |WEBSOCKET| E
-F[Message Receive Thread]
-D --> F
-E --> F
-
-G[Thread-safe Message Queue]
-F --> G
-
-H[Command Parser Thread]
-G --> H
-
-I{Command Valid?}
-H --> I
-J[Execute Command]
-K[Discard Message]
-I --> |YES| J
-I --> |NO| K
+Example message:
 
 ```
+{temp_set: 25, pub_rate: 20}
+```
 
-------------------------------------------------------------------------
+## Architecture
 
-# Thread Interaction
-
-``` mermaid
+```mermaid
 flowchart LR
-
-subgraph Transport Thread
-A[Receive Network Message]
-B[Push Message to Queue]
-A --> B
-end
-
-subgraph Shared Queue
-C[(Message Queue)]
-end
-
-subgraph Parser Thread
-D[Pop Message]
-E[Parse Command]
-F[Execute Command]
-D --> E --> F
-end
-
-B --> C
-C --> D
+    CLI["main: argument parsing"] --> SEL["transport_sel()"]
+    SEL -->|mqtt| MQTT["MQTT client<br/>libmosquitto"]
+    SEL -->|webs| WS["WebSocket server<br/>libwebsockets"]
+    MQTT -->|on message| Q[("ring buffer<br/>20 slots")]
+    WS -->|on receive| Q
+    Q --> P["parser thread<br/>string_parser()"]
+    P --> V["command values<br/>mutex-protected"]
 ```
 
-------------------------------------------------------------------------
+### Transport interface (strategy pattern in C)
 
-# Key Design Concepts
+Every transport embeds a `transport_type` whose first member is a pointer to a function table:
 
-## Strategy Pattern for Transport Layer
-
-The communication layer is implemented using the **Strategy design
-pattern**.
-
-The application interacts with a common **transport interface**, while
-concrete implementations provide protocol-specific behavior.
-
-```mermaid
-flowchart TD
-    A[Application Logic] 
-    B[Transport Interface]
-    A --> B
-
-    C[MQTT Strategy]
-    D[WebSocket Strategy]
-    B --> C
-    B --> D
+```c
+typedef struct transport_vtable {
+    int (*init)(transport_type *self);
+    int (*connect)(transport_type *self);
+    int (*poll)(transport_type *self);
+    int (*publish)(transport_type *self);
+    int (*destroy)(transport_type *self);
+} transport_vtable;
 ```
 
-The application does not need to know which transport is active.
+`main` only calls `tra->vt->init(tra)`, `connect`, `publish` and `destroy`. Adding a transport means writing one new source file with a constructor and its function table; `main` and the parser do not change.
 
-Benefits:
+### Concurrency
 
--   Protocol abstraction
--   Runtime transport selection
--   Clean separation of concerns
--   Easier testing and extensibility
+| Part | Mechanism |
+|---|---|
+| Parser thread | C11 `threads.h` (`thrd_create`, `thrd_join`) |
+| Message queue | Single-producer, single-consumer ring buffer with C11 atomic read/write indices |
+| Producer back-pressure | POSIX named semaphores (`sem_open`) around `queue_push` in the transport callbacks |
+| Shared command values | C11 mutex (`mtx_t`) |
 
-------------------------------------------------------------------------
+## Repository layout
 
-## Opaque Struct Architecture
-
-Transport objects are implemented using **opaque structs** to enforce
-encapsulation.
-
-Conceptually:
-
-```mermaid
-classDiagram
-    class Main {
-        +select transport
-        +call transport API
-    }
-
-    class transport_type {
-        <<interface>>
-        +init()
-        +connect()
-        +send()
-        +poll()
-        +destroy()
-    }
-
-    class mqtt_transport_type
-
-
-    class webs_transport_type
-
-    Main --> transport_type : uses
-    transport_type <|-- mqtt_transport_type
-    transport_type <|-- webs_transport_type
+```
+.
+├── device/
+│   ├── CMakeLists.txt
+│   ├── include/                transport.h, transport_select.h, shared_mem.h, string_parser.h
+│   ├── src/
+│   │   ├── main.c              argument parsing, thread start, main loop
+│   │   ├── transport_select.c  picks the transport constructor
+│   │   ├── mqtt_transport.c    libmosquitto client
+│   │   ├── ws_transport.c      libwebsockets server
+│   │   ├── shared_mem.c        ring buffer
+│   │   └── string_parser.c     command parsing and the parser thread
+│   └── tests/                  Unity tests
+├── docker-compose.yml          local Mosquitto broker
+└── .github/workflows/ci.yaml   build and test on every push
 ```
 
-The application only interacts with the **base transport interface**.
+## Build and run
 
-This mirrors object-oriented polymorphism implemented in **pure C**
-using function pointers.
+Requirements (Ubuntu / WSL2): a C11 compiler, CMake, pkg-config, libmosquitto and libwebsockets.
 
-------------------------------------------------------------------------
-
-## Multi-Threaded Message Processing
-
-The program separates networking and command execution into different
-threads.
-
-**Transport Thread** - Handles MQTT/WebSocket communication - Receives
-incoming messages - Pushes messages into a shared queue
-
-**Command Parser Thread** - Reads messages from the queue - Validates
-commands - Executes valid commands or discards invalid input
-
-This architecture prevents network I/O from blocking command processing.
-
-------------------------------------------------------------------------
-
-# Features
-
--   Modular C architecture
--   Runtime-selectable transport layer
--   Strategy pattern using function tables
--   Opaque structs for encapsulation
--   Multi-threaded message processing
--   Thread-safe queue with mutex synchronization
--   Command validation and parsing
--   Protocol-independent application layer
-
-------------------------------------------------------------------------
-
-# Project Structure
-
-```text
-project/
-├── src/
-│   ├── main.c
-│   ├── transport_select.c
-│   ├── mqtt_transport.c
-│   ├── websocket_transport.c
-│   ├── command_parser.c
-│   └── message_queue.c
-├── include/
-│   ├── transport.h
-│   ├── command_parser.h
-│   └── message_queue.h
-├── tests/
-|   ├── unity/
-|   |   ├──unity.c
-|   |   ├──unity.h
-|   |   ├──unity_internals.h
-│   ├── tests_queue.c
-│   ├── tests_string_parcer.c
-│   └── test_transport_select.c
-└── README.md
-└── Cmakelists.txt
+```bash
+sudo apt-get install -y build-essential cmake pkg-config libmosquitto-dev libwebsockets-dev
+cmake -S device -B device/build
+cmake --build device/build -j
 ```
 
-------------------------------------------------------------------------
+Start a local MQTT broker, then the device:
 
-# Testing
+```bash
+docker compose up -d
+./device/build/device_sim 1 mqtt 1883
+```
 
-Unit tests focus on core logic:
+Arguments: `device_sim <device_id> <transport> <port>`, where `transport` is `mqtt` or `webs` and the port has 4 digits. `-h` prints the usage.
 
--   command parsing
--   message validation
--   queue operations
--   transport selection
+Send a command from another terminal:
 
-These tests verify system behavior independently of the network layer.
+```bash
+mosquitto_pub -h 127.0.0.1 -p 1883 -t test/sub -m "{temp_set: 25}"
+```
 
-------------------------------------------------------------------------
+## Tests
 
-# Example Commands
+43 Unity tests cover the core logic without any network:
 
-temp_set: 25\
-pub_rate : 20
+| Test binary | Tests | Covers |
+|---|---|---|
+| `test_string_parser` | 27 | integer conversion, key lookup, whitespace removal, `key: value` parsing |
+| `test_queue` | 11 | push, pop, full and empty states, wrap-around |
+| `test_transport_select` | 5 | transport selection from the configuration |
 
-Invalid or malformed commands are safely ignored.
+```bash
+ctest --test-dir device/build --output-on-failure
+```
 
-------------------------------------------------------------------------
+GitHub Actions builds the project and runs all tests on every push.
 
-# Technologies Used
+## Roadmap
 
--   C
--   POSIX Threads (pthreads)
--   MQTT (libmosquitto)
--   WebSockets
--   Mutex synchronization
--   Function pointer tables
--   Opaque struct architecture
+- [ ] Make the parser thread block on the queue semaphore instead of polling
+- [ ] Integration test against the Mosquitto container in CI
+- [ ] Mock transport for testing `main` without a network
+- [ ] Configurable broker, topics and message size
+- [ ] UART transport, then a port to an STM32 or ESP32 with FreeRTOS
 
-------------------------------------------------------------------------
+## License
 
-# Purpose
-
-This project demonstrates techniques commonly used in **embedded and
-systems programming**:
-
--   Polymorphic interfaces in C
--   Protocol abstraction layers
--   Thread-safe concurrent systems
--   Modular architecture for maintainability and testing
-
-------------------------------------------------------------------------
-
-# Future Improvements
-
--   Integration tests with local MQTT broker
--   Mock transport layer
--   Additional transports (UART, TCP, CAN)
--   Continuous integration with automated tests
-
-------------------------------------------------------------------------
-
-# License
-
-MIT License
+[MIT](LICENSE)
