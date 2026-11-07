@@ -130,7 +130,7 @@ static int callback_ws(struct lws *wsi,
 }
 
 
-int *webs_init(transport_type* self)
+int webs_init(transport_type* self)
 {
     webs_transport_type *ws = (webs_transport_type *) self;
 
@@ -156,7 +156,7 @@ int *webs_init(transport_type* self)
         perror("sem_open SEM_OVERWRITE");
         printf("name='%s' errno=%d\n", SEM_OVERWRITE, errno);
         printf("Semephore open failed from mqtt\n");
-        exit;
+        exit();
     }
 
     sem_under_ws = sem_open(SEM_UNDERWRITE, 0);
@@ -165,7 +165,7 @@ int *webs_init(transport_type* self)
         perror("sem_open SEM_OVERWRITE");
         printf("name='%s' errno=%d\n", SEM_UNDERWRITE, errno);
         printf("Semephore under failed from mqtt\n");
-        exit;
+        exit();
     }
 
 
