@@ -356,6 +356,7 @@ int ws_server_thread(void* obj)
         }
     }
 
+    return 0;
 }
 
 
