@@ -156,7 +156,7 @@ int webs_init(transport_type* self)
         perror("sem_open SEM_OVERWRITE");
         printf("name='%s' errno=%d\n", SEM_OVERWRITE, errno);
         printf("Semephore open failed from mqtt\n");
-        exit();
+        exit(-1);
     }
 
     sem_under_ws = sem_open(SEM_UNDERWRITE, 0);
@@ -165,7 +165,7 @@ int webs_init(transport_type* self)
         perror("sem_open SEM_OVERWRITE");
         printf("name='%s' errno=%d\n", SEM_UNDERWRITE, errno);
         printf("Semephore under failed from mqtt\n");
-        exit();
+        exit(-2);
     }
 
 
@@ -295,11 +295,12 @@ int webs_destroy(transport_type* self)
 {
     webs_transport_type *ws = (webs_transport_type *) self;
 
-    if (!ws->serv) return;
+    if (!ws->serv) return 1;
     if (ws->serv->ctx) lws_context_destroy(ws->serv->ctx);
     free(ws->serv->pending);
     free(ws->serv->protocols);
     free(ws->serv);
+    return 0;
 }
 
 
