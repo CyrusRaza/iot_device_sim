@@ -146,7 +146,7 @@ int webs_init(transport_type* self)
     if (!ws->serv)
     {
         printf("fn webs_init: ws_server_t calloc failed\n");
-        return NULL;
+        return -2;
     }
     
 
